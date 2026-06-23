@@ -58,7 +58,8 @@ echo "Running Liquibase migrations..."
     --driver=org.postgresql.Driver \
     --url="jdbc:postgresql://localhost:${PG_PORT}/${DB_NAME}" \
     --username=postgres \
-    --changeLogFile="$CHANGELOG" \
+    --searchPath="$PROJECT_ROOT" \
+    --changeLogFile="liquibase/postgresql/master.xml" \
     update
 
 echo "Liquibase migrations completed successfully"
