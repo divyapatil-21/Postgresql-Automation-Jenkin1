@@ -9,6 +9,12 @@ pipeline {
 
     stages {
 
+        stage('Checkout SCM') {
+            steps {
+                checkout scm
+            }
+        }
+
         stage('Repository Audit') {
             steps {
                 sh 'ls -la'
@@ -16,17 +22,10 @@ pipeline {
         }
 
         stage('Set Script Permissions') {
-    steps {
-        sh 'chmod -R +x scripts/bash/'
-    }
-}
-
-stage('Validate Python Runtime') {
-    steps {
-        sh 'scripts/bash/common/validate_python_runtime.sh'
-    }
-}
-
+            steps {
+                sh 'chmod -R +x scripts/bash/'
+            }
+        }
 
         stage('Validate Python Runtime') {
             steps {
