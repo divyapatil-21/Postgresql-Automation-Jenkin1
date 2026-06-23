@@ -15,6 +15,19 @@ pipeline {
             }
         }
 
+        stage('Set Script Permissions') {
+    steps {
+        sh 'chmod -R +x scripts/bash/'
+    }
+}
+
+stage('Validate Python Runtime') {
+    steps {
+        sh 'scripts/bash/common/validate_python_runtime.sh'
+    }
+}
+
+
         stage('Validate Environment') {
             steps {
                 sh 'scripts/bash/postgresql/validate_environment.sh'
