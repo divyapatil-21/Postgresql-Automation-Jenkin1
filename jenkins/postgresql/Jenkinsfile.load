@@ -2,6 +2,11 @@ pipeline {
 
     agent any
 
+    environment {
+        PIPELINE_TYPE = "POSTGRESQL_LOAD"
+        DATABASE      = "POSTGRESQL"
+    }
+
     stages {
 
         stage('Checkout SCM') {
@@ -56,13 +61,13 @@ pipeline {
 
     post {
         success {
-            echo 'PostgreSQL Load Pipeline Completed Successfully'
+            echo 'WINDOWS POSTGRESQL LOAD SUCCESSFUL'
         }
         failure {
-            echo 'PostgreSQL Load Pipeline Failed'
+            echo 'WINDOWS POSTGRESQL LOAD FAILED'
         }
         always {
-            echo 'PostgreSQL Load Pipeline Completed'
+            echo 'WINDOWS POSTGRESQL LOAD PIPELINE COMPLETED'
         }
     }
 }
