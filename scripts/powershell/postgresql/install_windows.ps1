@@ -14,12 +14,13 @@ function Get-ProjectRoot {
 }
 
 $ProjectRoot = Get-ProjectRoot
+$PgDir       = Join-Path $ProjectRoot "databases\postgresql"
+$PgBin       = Join-Path $PgDir "bin"
 
 Write-Log "Project Root : $ProjectRoot"
 
 # Read config
 $ConfigFile = Join-Path $ProjectRoot "config\postgresql.conf"
-
 if (!(Test-Path $ConfigFile)) {
     throw "Configuration file not found: $ConfigFile"
 }
@@ -33,73 +34,86 @@ Get-Content $ConfigFile | ForEach-Object {
 
 $ExpectedPort = [int]$Config["POSTGRESQL_PORT"]
 $DBName       = $Config["POSTGRESQL_DATABASE"]
-$AdminUser    = $Config["POSTGRESQL_ADMIN_USER"]
 
 Write-Log "Expected Database : $DBName"
 Write-Log "Expected Port     : $ExpectedPort"
 
-# ---- Check if PostgreSQL already installed ----
+# ---- Check project folder first ----
 Write-Log "Searching for existing PostgreSQL installation..."
 
-$PsqlCmd = Get-Command psql -ErrorAction SilentlyContinue
-
-if ($PsqlCmd) {
-
-    $Version = (& $PsqlCmd.Source "--version" 2>&1)
-    Write-Log "PostgreSQL already installed : $Version"
-
-    # Verify service exists
-    $Service = Get-Service | Where-Object { $_.Name -match "postgres" } | Select-Object -First 1
-
-    if ($Service) {
-        Write-Log "Service detected : $($Service.Name) [$($Service.Status)]"
-    } else {
-        Write-Log "WARNING: No PostgreSQL service found - may need manual start"
-    }
-
-    Write-Log "Reusing existing installation"
+if (Test-Path "$PgBin\psql.exe") {
+    Write-Log "PostgreSQL already installed in project folder: $PgDir"
     exit 0
 }
 
-# ---- PostgreSQL not found - try to install ----
-Write-Log "PostgreSQL not found in PATH"
-Write-Log "Checking for pre-downloaded installer..."
+# ---- Check system PATH ----
+$PsqlCmd = Get-Command psql -ErrorAction SilentlyContinue
+if ($PsqlCmd) {
+    $Version = (& $PsqlCmd.Source "--version" 2>&1)
+    Write-Log "PostgreSQL found in system PATH: $Version"
+    Write-Log "Copying binaries to project folder..."
+
+    # Find PostgreSQL base dir
+    $PgSystemBin = Split-Path $PsqlCmd.Source -Parent
+    $PgSystemDir = Split-Path $PgSystemBin -Parent
+
+    New-Item -ItemType Directory -Path $PgBin -Force | Out-Null
+
+    # Copy binaries
+    Copy-Item "$PgSystemBin\*" -Destination $PgBin -Recurse -Force
+
+    # Copy lib if exists
+    $PgSystemLib = Join-Path $PgSystemDir "lib"
+    if (Test-Path $PgSystemLib) {
+        $PgLib = Join-Path $PgDir "lib"
+        New-Item -ItemType Directory -Path $PgLib -Force | Out-Null
+        Copy-Item "$PgSystemLib\*" -Destination $PgLib -Recurse -Force
+    }
+
+    # Copy share if exists
+    $PgSystemShare = Join-Path $PgSystemDir "share"
+    if (Test-Path $PgSystemShare) {
+        $PgShare = Join-Path $PgDir "share"
+        New-Item -ItemType Directory -Path $PgShare -Force | Out-Null
+        Copy-Item "$PgSystemShare\*" -Destination $PgShare -Recurse -Force
+    }
+
+    Write-Log "Binaries copied to project folder: $PgDir"
+
+    # Initialize data directory
+    $PgData = Join-Path $PgDir "data"
+    if (!(Test-Path "$PgData\PG_VERSION")) {
+        Write-Log "Initializing data directory..."
+        & "$PgBin\initdb.exe" -D $PgData --auth=trust --username=postgres
+        Write-Log "Data directory initialized: $PgData"
+    }
+
+    Write-Log "PostgreSQL project folder setup complete"
+    exit 0
+}
+
+# ---- Download and install ----
+Write-Log "PostgreSQL not found - downloading installer..."
 
 $InstallerDir  = Join-Path $ProjectRoot "databases\postgresql\installer"
 $InstallerFile = Join-Path $InstallerDir "postgresql-installer.exe"
 
 if (!(Test-Path $InstallerFile)) {
-
-    Write-Log "Installer not found - downloading automatically..."
-
     New-Item -ItemType Directory -Path $InstallerDir -Force | Out-Null
-
     $DownloadUrl = "https://get.enterprisedb.com/postgresql/postgresql-17.5-1-windows-x64.exe"
-
     Write-Log "Downloading from: $DownloadUrl"
-
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-    Invoke-WebRequest `
-        -Uri     $DownloadUrl `
-        -OutFile $InstallerFile `
-        -TimeoutSec 600
-
+    Invoke-WebRequest -Uri $DownloadUrl -OutFile $InstallerFile -TimeoutSec 600
     Write-Log "Download complete"
-}
-
-# Create installer dir if missing
-if (!(Test-Path $InstallerDir)) {
-    New-Item -ItemType Directory -Path $InstallerDir -Force | Out-Null
 }
 
 Write-Log "Installer found : $InstallerFile"
 Write-Log "Starting unattended installation..."
 
-$Arguments = "--mode unattended --superpassword postgres --serverport $($ExpectedPort.ToString()) --prefix `"$ProjectRoot\databases\postgresql`" --datadir `"$ProjectRoot\databases\postgresql\data`""
+$Arguments = "--mode unattended --superpassword postgres --serverport $($ExpectedPort.ToString())"
 
 $Process = Start-Process `
-    -FilePath  $InstallerFile `
+    -FilePath    $InstallerFile `
     -ArgumentList $Arguments `
     -Wait `
     -PassThru
@@ -110,17 +124,9 @@ if ($Process.ExitCode -ne 0) {
     throw "PostgreSQL installation failed with exit code: $($Process.ExitCode)"
 }
 
-# Refresh PATH
-$env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" +
-            [System.Environment]::GetEnvironmentVariable("PATH", "User")
-
 Start-Sleep -Seconds 15
 
-# Refresh PATH after install
-$env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","Machine") + ";" +
-            [System.Environment]::GetEnvironmentVariable("PATH","User")
-
-# Also search common PostgreSQL bin locations
+# Find installed location and copy to project folder
 $PgBinPaths = @(
     "C:\Program Files\PostgreSQL\17\bin",
     "C:\Program Files\PostgreSQL\16\bin",
@@ -129,15 +135,37 @@ $PgBinPaths = @(
 
 foreach ($BinPath in $PgBinPaths) {
     if (Test-Path "$BinPath\psql.exe") {
-        $env:PATH = "$BinPath;$env:PATH"
-        Write-Log "Added to PATH: $BinPath"
+        Write-Log "Found installation at: $BinPath"
+        $PgSystemDir = Split-Path $BinPath -Parent
+
+        New-Item -ItemType Directory -Path $PgBin -Force | Out-Null
+        Copy-Item "$BinPath\*" -Destination $PgBin -Recurse -Force
+
+        $PgSystemLib = Join-Path $PgSystemDir "lib"
+        if (Test-Path $PgSystemLib) {
+            $PgLib = Join-Path $PgDir "lib"
+            New-Item -ItemType Directory -Path $PgLib -Force | Out-Null
+            Copy-Item "$PgSystemLib\*" -Destination $PgLib -Recurse -Force
+        }
+
+        $PgSystemShare = Join-Path $PgSystemDir "share"
+        if (Test-Path $PgSystemShare) {
+            $PgShare = Join-Path $PgDir "share"
+            New-Item -ItemType Directory -Path $PgShare -Force | Out-Null
+            Copy-Item "$PgSystemShare\*" -Destination $PgShare -Recurse -Force
+        }
+
+        Write-Log "Binaries copied to project folder: $PgDir"
         break
     }
 }
 
-$PsqlCmd = Get-Command psql -ErrorAction SilentlyContinue
-
-if (!$PsqlCmd) {
-    Write-Log "WARNING: psql not in PATH yet - PostgreSQL service may still need restart"
-    Write-Log "Continuing deployment..."
+# Initialize data directory
+$PgData = Join-Path $PgDir "data"
+if (!(Test-Path "$PgData\PG_VERSION")) {
+    Write-Log "Initializing data directory..."
+    & "$PgBin\initdb.exe" -D $PgData --auth=trust --username=postgres
+    Write-Log "Data directory initialized: $PgData"
 }
+
+Write-Log "PostgreSQL project folder installation complete"

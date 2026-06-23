@@ -20,7 +20,6 @@ $PgData      = Join-Path $PgDir "data"
 $PgCtl       = Join-Path $PgBin "pg_ctl.exe"
 $PgLog       = Join-Path $ProjectRoot "outputs\logs\postgresql.log"
 
-# Read config
 $ConfigFile = Join-Path $ProjectRoot "config\postgresql.conf"
 $Config = @{}
 Get-Content $ConfigFile | ForEach-Object {
@@ -35,9 +34,8 @@ Write-Log "PG Bin       : $PgBin"
 Write-Log "PG Data      : $PgData"
 Write-Log "Port         : $Port"
 
-# Check pg_ctl exists
 if (!(Test-Path $PgCtl)) {
-    throw "pg_ctl not found at: $PgCtl — install step failed?"
+    throw "pg_ctl not found at: $PgCtl - install step failed?"
 }
 
 # Already running check
@@ -47,7 +45,6 @@ if ($StatusOutput -match "server is running") {
     exit 0
 }
 
-# Start
 Write-Log "Starting PostgreSQL from project folder..."
 New-Item -ItemType Directory -Path (Split-Path $PgLog) -Force | Out-Null
 
