@@ -12,18 +12,16 @@ echo
 
 CONFIG_FILE="$PROJECT_ROOT/config/postgresql.conf"
 
-PG_HOST=$(grep    "^POSTGRESQL_HOST="           "$CONFIG_FILE" | cut -d'=' -f2)
-PG_PORT=$(grep    "^POSTGRESQL_PORT="           "$CONFIG_FILE" | cut -d'=' -f2)
-PG_DB=$(grep      "^POSTGRESQL_DATABASE="       "$CONFIG_FILE" | cut -d'=' -f2)
-PG_USER=$(grep    "^POSTGRESQL_ADMIN_USER="     "$CONFIG_FILE" | cut -d'=' -f2)
-PG_PASSWORD=$(grep "^POSTGRESQL_ADMIN_PASSWORD=" "$CONFIG_FILE" | cut -d'=' -f2)
-LIQUIBASE_VERSION=$(grep "^LIQUIBASE_VERSION="  "$CONFIG_FILE" | cut -d'=' -f2)
+PG_HOST=$(grep    "^POSTGRESQL_HOST="               "$CONFIG_FILE" | cut -d'=' -f2)
+PG_PORT=$(grep    "^POSTGRESQL_PORT="               "$CONFIG_FILE" | cut -d'=' -f2)
+PG_DB=$(grep      "^POSTGRESQL_DATABASE="           "$CONFIG_FILE" | cut -d'=' -f2)
+PG_USER=$(grep    "^POSTGRESQL_ADMIN_USER="         "$CONFIG_FILE" | cut -d'=' -f2)
+PG_PASSWORD=$(grep "^POSTGRESQL_ADMIN_PASSWORD="    "$CONFIG_FILE" | cut -d'=' -f2)
+LIQUIBASE_VERSION=$(grep "^LIQUIBASE_VERSION="      "$CONFIG_FILE" | cut -d'=' -f2)
 DRIVER_VERSION=$(grep "^POSTGRESQL_DRIVER_VERSION=" "$CONFIG_FILE" | cut -d'=' -f2)
 
 LB="$PROJECT_ROOT/tools/liquibase/liquibase"
 DRIVER="$PROJECT_ROOT/tools/drivers/postgresql-${DRIVER_VERSION}.jar"
-CHANGELOG_DIR="$PROJECT_ROOT/liquibase/postgresql"
-CHANGELOG_FILE="$CHANGELOG_DIR/master.xml"
 
 # ---- Auto-download Liquibase if missing ----
 if [ ! -f "$LB" ]; then
@@ -63,11 +61,14 @@ java -version
 
 echo
 
+# CRITICAL: cd into changelog dir first — Liquibase 5.x resolves
+# relative <include> files from CWD, not from --changeLogFile path.
+cd "$PROJECT_ROOT/liquibase/postgresql"
+
 "$LB" \
   --classpath="$DRIVER" \
   --driver=org.postgresql.Driver \
-  --changeLogFile="$CHANGELOG_FILE" \
-  --searchPath="$CHANGELOG_DIR" \
+  --changeLogFile=master.xml \
   --url="jdbc:postgresql://$PG_HOST:$PG_PORT/$PG_DB" \
   --username="$PG_USER" \
   --password="$PG_PASSWORD" \
