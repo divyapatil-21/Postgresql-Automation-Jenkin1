@@ -19,11 +19,11 @@ def load_orders(csv_file):
             VALUES (%s, %s, %s, %s, %s)
             """,
             (
-                row["order_id"],
-                row["customer_id"],
-                row["product_id"],
-                row["quantity"],
-                row["order_date"]
+                int(row["order_id"]),
+                int(row["customer_id"]),
+                int(row["product_id"]),
+                int(row["quantity"]),
+                str(row["order_date"])
             )
         )
 

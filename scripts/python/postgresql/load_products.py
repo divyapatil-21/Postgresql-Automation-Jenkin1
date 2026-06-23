@@ -19,10 +19,10 @@ def load_products(csv_file):
             VALUES (%s, %s, %s, %s)
             """,
             (
-                row["product_id"],
-                row["product_name"],
-                row["category"],
-                row["price"]
+                int(row["product_id"]),
+                str(row["product_name"]),
+                str(row["category"]),
+                float(row["price"])
             )
         )
 

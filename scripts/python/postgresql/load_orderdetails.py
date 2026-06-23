@@ -19,11 +19,11 @@ def load_orderdetails(csv_file):
             VALUES (%s, %s, %s, %s, %s)
             """,
             (
-                row["orderdetail_id"],
-                row["order_id"],
-                row["product_id"],
-                row["quantity"],
-                row["unit_price"]
+                int(row["orderdetail_id"]),
+                int(row["order_id"]),
+                int(row["product_id"]),
+                int(row["quantity"]),
+                float(row["unit_price"])
             )
         )
 

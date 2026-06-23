@@ -19,10 +19,10 @@ def load_customers(csv_file):
             VALUES (%s, %s, %s, %s)
             """,
             (
-                row["customer_id"],
-                row["customer_name"],
-                row["email"],
-                row["city"]
+                int(row["customer_id"]),
+                str(row["customer_name"]),
+                str(row["email"]),
+                str(row["city"])
             )
         )
 
