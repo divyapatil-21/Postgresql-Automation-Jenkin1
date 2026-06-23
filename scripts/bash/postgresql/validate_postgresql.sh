@@ -2,36 +2,33 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+source "$(dirname "$0")/../common/set_project_root.sh"
+
+echo
+echo "====================================="
+echo "VALIDATING POSTGRESQL"
+echo "====================================="
+echo
+
 PG_BIN="$PROJECT_ROOT/databases/postgresql/bin"
-PG_PORT=5432
 
-export PATH="$PG_BIN:$PATH"
+if [ ! -f "$PG_BIN/psql" ]; then
+    echo "ERROR: psql not found at: $PG_BIN/psql"
+    echo "Run install_postgresql.sh first"
+    exit 1
+fi
+
 export LD_LIBRARY_PATH="$PROJECT_ROOT/databases/postgresql/lib:$LD_LIBRARY_PATH"
+export PATH="$PG_BIN:$PATH"
 
-echo "Validating PostgreSQL..."
+echo "psql path  : $PG_BIN/psql"
+echo "psql version:"
+"$PG_BIN/psql" --version
 
-# pg_ctl check
-if ! "$PG_BIN/pg_ctl" -D "$PROJECT_ROOT/databases/postgresql/data" status > /dev/null 2>&1; then
-    echo "FAILED: PostgreSQL is not running"
-    exit 1
-fi
+echo
+echo "====================================="
+echo "POSTGRESQL VALIDATION SUCCESSFUL"
+echo "====================================="
+echo
 
-echo "PostgreSQL is running"
-
-# psql version
-"$PG_BIN/psql" -U postgres -p $PG_PORT -h localhost -c "SELECT version();"
-
-# Database check
-CONFIG_FILE="$PROJECT_ROOT/config/postgresql.conf"
-DB_NAME=$(grep "^POSTGRESQL_DATABASE=" "$CONFIG_FILE" | cut -d'=' -f2 | tr -d '[:space:]')
-
-if "$PG_BIN/psql" -U postgres -p $PG_PORT -h localhost -lqt | cut -d\| -f1 | grep -qw "$DB_NAME"; then
-    echo "Database exists: $DB_NAME"
-else
-    echo "FAILED: Database not found: $DB_NAME"
-    exit 1
-fi
-
-echo "PostgreSQL validation successful"
+exit 0

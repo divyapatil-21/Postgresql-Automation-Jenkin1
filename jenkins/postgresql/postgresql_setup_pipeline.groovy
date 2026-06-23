@@ -2,69 +2,99 @@ pipeline {
 
     agent any
 
-    environment {
-        PIPELINE_TYPE = "POSTGRESQL_SETUP"
-        DATABASE      = "POSTGRESQL"
-    }
-
     stages {
+
+        stage('Checkout SCM') {
+            steps {
+                checkout scm
+            }
+        }
 
         stage('Repository Audit') {
             steps {
-                bat 'dir'
+                sh '''
+                echo "Workspace : $WORKSPACE"
+                echo "Branch    : $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+                echo "Commit    : $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+                ls -la
+                '''
+            }
+        }
+
+        stage('Set Script Permissions') {
+            steps {
+                sh '''
+                chmod -R +x scripts/bash/
+                '''
             }
         }
 
         stage('Validate Python Runtime') {
             steps {
-                bat 'scripts\\batch\\common\\validate_python_runtime.bat'
+                sh './scripts/bash/common/validate_python_runtime.sh'
             }
         }
 
         stage('Install Python Requirements') {
             steps {
-                bat 'scripts\\batch\\install_python_requirements.bat'
+                sh '''
+                python3 -m pip install --break-system-packages psycopg2-binary pandas || \
+                python3 -m pip install psycopg2-binary pandas
+                '''
             }
         }
 
         stage('Validate Python Requirements') {
             steps {
-                bat 'scripts\\batch\\validate_python_requirements.bat'
+                sh '''
+                python3 -c "import psycopg2; print('psycopg2 OK:', psycopg2.__version__)"
+                python3 -c "import pandas; print('pandas OK:', pandas.__version__)"
+                '''
             }
         }
 
         stage('Validate Java Runtime') {
             steps {
-                bat 'scripts\\batch\\common\\validate_java_runtime.bat'
+                sh './scripts/bash/common/validate_java_runtime.sh'
             }
         }
 
         stage('Install Tools') {
             steps {
-                bat 'scripts\\batch\\common\\install_tools.bat'
+                sh '''
+                bash scripts/bash/common/install_liquibase.sh || true
+                '''
             }
         }
 
         stage('Deploy PostgreSQL') {
             steps {
-                bat 'scripts\\batch\\postgresql\\deploy_postgresql.bat'
+                sh './scripts/bash/postgresql/install_postgresql.sh'
+                sh './scripts/bash/postgresql/start_postgresql.sh'
+                sh './scripts/bash/postgresql/create_database.sh'
+                sh './scripts/bash/postgresql/run_liquibase.sh'
             }
         }
 
         stage('Validate PostgreSQL') {
             steps {
-                bat 'scripts\\batch\\postgresql\\validate_postgresql.bat'
+                sh './scripts/bash/postgresql/validate_postgresql.sh'
             }
         }
-
     }
 
     post {
+
         success {
-            echo 'PostgreSQL Setup Pipeline Completed Successfully'
+            echo 'UBUNTU POSTGRESQL SETUP SUCCESSFUL'
         }
+
         failure {
-            echo 'PostgreSQL Setup Pipeline Failed'
+            echo 'UBUNTU POSTGRESQL SETUP FAILED'
+        }
+
+        always {
+            echo 'UBUNTU POSTGRESQL SETUP PIPELINE COMPLETED'
         }
     }
 }

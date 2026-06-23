@@ -2,15 +2,26 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+source "$(dirname "$0")/../common/set_project_root.sh"
+
+echo
+echo "====================================="
+echo "LOADING DATA"
+echo "====================================="
+echo
+
 PG_BIN="$PROJECT_ROOT/databases/postgresql/bin"
 
-export PATH="$PG_BIN:$PATH"
 export LD_LIBRARY_PATH="$PROJECT_ROOT/databases/postgresql/lib:$LD_LIBRARY_PATH"
+export PATH="$PG_BIN:$PATH"
 
-echo "Loading data into PostgreSQL..."
+python3 \
+"${PROJECT_ROOT}/scripts/python/postgresql/load_all.py"
 
-python3 "${PROJECT_ROOT}/scripts/python/postgresql/load_all.py"
+echo
+echo "====================================="
+echo "DATA LOAD SUCCESSFUL"
+echo "====================================="
+echo
 
-echo "Data load successful"
+exit 0

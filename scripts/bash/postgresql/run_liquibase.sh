@@ -2,61 +2,81 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-PG_BIN="$PROJECT_ROOT/databases/postgresql/bin"
-PG_PORT=5432
+source "$(dirname "$0")/../common/set_project_root.sh"
 
-export PATH="$PG_BIN:$PATH"
-export LD_LIBRARY_PATH="$PROJECT_ROOT/databases/postgresql/lib:$LD_LIBRARY_PATH"
+echo
+echo "====================================="
+echo "RUNNING LIQUIBASE"
+echo "====================================="
+echo
 
 CONFIG_FILE="$PROJECT_ROOT/config/postgresql.conf"
-DB_NAME=$(grep "^POSTGRESQL_DATABASE=" "$CONFIG_FILE" | cut -d'=' -f2 | tr -d '[:space:]')
-DRIVER_VERSION=$(grep "^POSTGRESQL_DRIVER_VERSION=" "$CONFIG_FILE" | cut -d'=' -f2 | tr -d '[:space:]')
-LIQUIBASE_VERSION=$(grep "^LIQUIBASE_VERSION=" "$CONFIG_FILE" | cut -d'=' -f2 | tr -d '[:space:]')
 
-DRIVERS_DIR="$PROJECT_ROOT/tools/drivers"
-LIQUIBASE_DIR="$PROJECT_ROOT/tools/liquibase"
-DRIVER_JAR="$DRIVERS_DIR/postgresql-${DRIVER_VERSION}.jar"
+PG_HOST=$(grep "^POSTGRESQL_HOST=" "$CONFIG_FILE" | cut -d'=' -f2)
+PG_PORT=$(grep "^POSTGRESQL_PORT=" "$CONFIG_FILE" | cut -d'=' -f2)
+PG_DB=$(grep "^POSTGRESQL_DATABASE=" "$CONFIG_FILE" | cut -d'=' -f2)
+PG_USER=$(grep "^POSTGRESQL_ADMIN_USER=" "$CONFIG_FILE" | cut -d'=' -f2)
+PG_PASSWORD=$(grep "^POSTGRESQL_ADMIN_PASSWORD=" "$CONFIG_FILE" | cut -d'=' -f2)
+LIQUIBASE_VERSION=$(grep "^LIQUIBASE_VERSION=" "$CONFIG_FILE" | cut -d'=' -f2)
+DRIVER_VERSION=$(grep "^POSTGRESQL_DRIVER_VERSION=" "$CONFIG_FILE" | cut -d'=' -f2)
 
-echo "DB Name           : $DB_NAME"
-echo "Driver Version    : $DRIVER_VERSION"
-echo "Liquibase Version : $LIQUIBASE_VERSION"
+LB="$PROJECT_ROOT/tools/liquibase/liquibase"
+DRIVER="$PROJECT_ROOT/tools/drivers/postgresql-${DRIVER_VERSION}.jar"
+CHANGELOG="liquibase/postgresql/master.xml"
 
-# Download driver if missing
-mkdir -p "$DRIVERS_DIR"
-if [ ! -f "$DRIVER_JAR" ]; then
-    echo "Downloading PostgreSQL JDBC driver..."
-    wget -q "https://repo1.maven.org/maven2/org/postgresql/postgresql/${DRIVER_VERSION}/postgresql-${DRIVER_VERSION}.jar" \
-        -O "$DRIVER_JAR"
-    echo "Driver downloaded: $DRIVER_JAR"
+# ---- Auto-download Liquibase if missing ----
+if [ ! -f "$LB" ]; then
+    echo "Liquibase not found - downloading version ${LIQUIBASE_VERSION}..."
+    mkdir -p "$PROJECT_ROOT/tools/liquibase"
+    sudo apt-get update -qq
+    sudo apt-get install -y wget unzip
+    wget -q -O "$PROJECT_ROOT/tools/liquibase.zip" \
+        "https://github.com/liquibase/liquibase/releases/download/v${LIQUIBASE_VERSION}/liquibase-${LIQUIBASE_VERSION}.zip"
+    unzip -q -o "$PROJECT_ROOT/tools/liquibase.zip" -d "$PROJECT_ROOT/tools/liquibase"
+    chmod +x "$LB"
+    rm -f "$PROJECT_ROOT/tools/liquibase.zip"
+    echo "Liquibase installed: $("$LB" --version 2>&1 | head -1)"
 else
-    echo "Driver already exists: $DRIVER_JAR"
+    echo "Liquibase already present"
 fi
 
-# Download Liquibase if missing
-mkdir -p "$LIQUIBASE_DIR"
-if [ ! -f "$LIQUIBASE_DIR/liquibase" ]; then
-    echo "Downloading Liquibase ${LIQUIBASE_VERSION}..."
-    wget -q "https://github.com/liquibase/liquibase/releases/download/v${LIQUIBASE_VERSION}/liquibase-${LIQUIBASE_VERSION}.tar.gz" \
-        -O /tmp/liquibase.tar.gz
-    tar -xzf /tmp/liquibase.tar.gz -C "$LIQUIBASE_DIR"
-    chmod +x "$LIQUIBASE_DIR/liquibase"
-    echo "Liquibase installed"
+# ---- Auto-download JDBC driver if missing ----
+if [ ! -f "$DRIVER" ]; then
+    echo "PostgreSQL JDBC driver not found - downloading version ${DRIVER_VERSION}..."
+    mkdir -p "$PROJECT_ROOT/tools/drivers"
+    wget -q -O "$DRIVER" \
+        "https://jdbc.postgresql.org/download/postgresql-${DRIVER_VERSION}.jar"
+    echo "Driver downloaded: $DRIVER"
 else
-    echo "Liquibase already exists: $LIQUIBASE_DIR"
+    echo "JDBC driver already present"
 fi
 
-# Run Liquibase
-echo "Running Liquibase migrations..."
+cd "$PROJECT_ROOT"
 
-"$LIQUIBASE_DIR/liquibase" \
-    --classpath="$DRIVER_JAR" \
-    --driver=org.postgresql.Driver \
-    --url="jdbc:postgresql://localhost:${PG_PORT}/${DB_NAME}" \
-    --username=postgres \
-    --searchPath="$PROJECT_ROOT,$PROJECT_ROOT/liquibase/postgresql" \
-    --changeLogFile="liquibase/postgresql/master.xml" \
-    update
+echo "Database : $PG_DB"
+echo "Host     : $PG_HOST"
+echo "Port     : $PG_PORT"
+echo "User     : $PG_USER"
+echo "Driver   : $DRIVER"
+echo
 
-echo "Liquibase migrations completed successfully"
+java -version
+
+echo
+
+"$LB" \
+--classpath="$DRIVER" \
+--driver=org.postgresql.Driver \
+--changeLogFile="$CHANGELOG" \
+--url="jdbc:postgresql://$PG_HOST:$PG_PORT/$PG_DB" \
+--username="$PG_USER" \
+--password="$PG_PASSWORD" \
+update
+
+echo
+echo "====================================="
+echo "LIQUIBASE UPDATE COMPLETED"
+echo "====================================="
+echo
+
+exit 0
