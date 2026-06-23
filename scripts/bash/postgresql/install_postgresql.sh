@@ -1,12 +1,17 @@
 #!/bin/bash
-
 set -e
 
 if command -v psql >/dev/null 2>&1; then
-    echo "PostgreSQL already installed"
+    echo "PostgreSQL already installed: $(psql --version)"
     exit 0
 fi
 
-echo "PostgreSQL installation required"
+echo "PostgreSQL not found - installing automatically..."
 
-exit 0
+sudo apt-get update -y
+sudo apt-get install -y postgresql postgresql-client
+
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
+
+echo "PostgreSQL installed successfully: $(psql --version)"
