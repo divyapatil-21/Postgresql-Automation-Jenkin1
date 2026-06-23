@@ -2,11 +2,6 @@ pipeline {
 
     agent any
 
-    environment {
-        PIPELINE_TYPE = "POSTGRESQL_LOAD"
-        DATABASE      = "POSTGRESQL"
-    }
-
     stages {
 
         stage('Checkout SCM') {
