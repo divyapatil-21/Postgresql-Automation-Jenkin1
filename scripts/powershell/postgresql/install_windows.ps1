@@ -96,11 +96,7 @@ if (!(Test-Path $InstallerDir)) {
 Write-Log "Installer found : $InstallerFile"
 Write-Log "Starting unattended installation..."
 
-$Arguments = @(
-    "--mode",         "unattended",
-    "--superpassword", "",
-    "--serverport",   $ExpectedPort.ToString()
-)
+$Arguments = "--mode unattended --superpassword postgres --serverport $($ExpectedPort.ToString())"
 
 $Process = Start-Process `
     -FilePath  $InstallerFile `
