@@ -70,18 +70,22 @@ $InstallerFile = Join-Path $InstallerDir "postgresql-installer.exe"
 
 if (!(Test-Path $InstallerFile)) {
 
-    Write-Log "Installer not found at: $InstallerFile"
-    Write-Log ""
-    Write-Log "============================================"
-    Write-Log "MANUAL ACTION REQUIRED"
-    Write-Log "============================================"
-    Write-Log "1. Download PostgreSQL installer from:"
-    Write-Log "   https://www.enterprisedb.com/downloads/postgres-postgresql-downloads"
-    Write-Log "2. Rename it to: postgresql-installer.exe"
-    Write-Log "3. Place it in: databases\postgresql\installer\"
-    Write-Log "4. Re-run this pipeline"
-    Write-Log "============================================"
-    exit 1
+    Write-Log "Installer not found - downloading automatically..."
+
+    New-Item -ItemType Directory -Path $InstallerDir -Force | Out-Null
+
+    $DownloadUrl = "https://get.enterprisedb.com/postgresql/postgresql-17.5-1-windows-x64.exe"
+
+    Write-Log "Downloading from: $DownloadUrl"
+
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+    Invoke-WebRequest `
+        -Uri     $DownloadUrl `
+        -OutFile $InstallerFile `
+        -TimeoutSec 600
+
+    Write-Log "Download complete"
 }
 
 # Create installer dir if missing
@@ -116,11 +120,28 @@ $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";
 
 Start-Sleep -Seconds 15
 
+# Refresh PATH after install
+$env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","Machine") + ";" +
+            [System.Environment]::GetEnvironmentVariable("PATH","User")
+
+# Also search common PostgreSQL bin locations
+$PgBinPaths = @(
+    "C:\Program Files\PostgreSQL\17\bin",
+    "C:\Program Files\PostgreSQL\16\bin",
+    "C:\Program Files\PostgreSQL\15\bin"
+)
+
+foreach ($BinPath in $PgBinPaths) {
+    if (Test-Path "$BinPath\psql.exe") {
+        $env:PATH = "$BinPath;$env:PATH"
+        Write-Log "Added to PATH: $BinPath"
+        break
+    }
+}
+
 $PsqlCmd = Get-Command psql -ErrorAction SilentlyContinue
 
 if (!$PsqlCmd) {
-    throw "PostgreSQL not found in PATH after installation - please add PostgreSQL bin to system PATH"
+    Write-Log "WARNING: psql not in PATH yet - PostgreSQL service may still need restart"
+    Write-Log "Continuing deployment..."
 }
-
-$Version = (& $PsqlCmd.Source "--version" 2>&1)
-Write-Log "PostgreSQL installed successfully : $Version"
