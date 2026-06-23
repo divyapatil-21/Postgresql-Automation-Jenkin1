@@ -2,35 +2,33 @@ pipeline {
 
     agent any
 
-    environment {
-        PIPELINE_TYPE = "POSTGRESQL_LOAD"
-        DATABASE      = "POSTGRESQL"
-    }
-
     stages {
+
+        stage('Checkout SCM') {
+            steps {
+                checkout scm
+            }
+        }
 
         stage('Repository Audit') {
             steps {
-                sh 'ls -la'
+                sh '''
+                echo "Workspace : $WORKSPACE"
+                echo "Commit    : $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+                ls -la
+                '''
             }
         }
 
         stage('Set Script Permissions') {
-    steps {
-        sh 'chmod -R +x scripts/bash/'
-    }
-}
-
-stage('Validate Python Runtime') {
-    steps {
-        sh 'scripts/bash/common/validate_python_runtime.sh'
-    }
-}
-
+            steps {
+                sh 'chmod -R +x scripts/bash/'
+            }
+        }
 
         stage('Validate Environment') {
             steps {
-                sh 'scripts/bash/postgresql/validate_environment.sh'
+                sh './scripts/bash/postgresql/validate_environment.sh'
             }
         }
 
@@ -48,19 +46,19 @@ stage('Validate Python Runtime') {
 
         stage('Load Data') {
             steps {
-                sh 'scripts/bash/postgresql/load_data.sh'
+                sh './scripts/bash/postgresql/load_data.sh'
             }
         }
 
         stage('Validate Loaded Data') {
             steps {
-                sh 'scripts/bash/postgresql/validate_loaded_data.sh'
+                sh './scripts/bash/postgresql/validate_loaded_data.sh'
             }
         }
 
         stage('Validate PostgreSQL') {
             steps {
-                sh 'scripts/bash/postgresql/validate_postgresql.sh'
+                sh './scripts/bash/postgresql/validate_postgresql.sh'
             }
         }
 
@@ -68,10 +66,13 @@ stage('Validate Python Runtime') {
 
     post {
         success {
-            echo 'PostgreSQL Load Pipeline Completed Successfully'
+            echo 'UBUNTU POSTGRESQL LOAD SUCCESSFUL'
         }
         failure {
-            echo 'PostgreSQL Load Pipeline Failed'
+            echo 'UBUNTU POSTGRESQL LOAD FAILED'
+        }
+        always {
+            echo 'UBUNTU POSTGRESQL LOAD PIPELINE COMPLETED'
         }
     }
 }

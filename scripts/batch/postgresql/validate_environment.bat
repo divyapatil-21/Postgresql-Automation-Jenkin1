@@ -22,13 +22,6 @@ if errorlevel 1 (
 )
 
 echo.
-echo --- PostgreSQL Client ---
-psql --version
-if errorlevel 1 (
-    echo WARN: psql client not in PATH (may still be installed as service)
-)
-
-echo.
 echo --- pip ---
 pip --version
 if errorlevel 1 (
@@ -37,6 +30,18 @@ if errorlevel 1 (
 )
 
 echo.
-echo Environment validation completed
+echo --- PostgreSQL Client (project folder) ---
+set PG_BIN=%~dp0..\..\..\databases\postgresql\bin
+if exist "%PG_BIN%\psql.exe" (
+    "%PG_BIN%\psql.exe" --version
+    echo PostgreSQL client found in project folder
+) else (
+    echo WARN: psql not in project folder - run setup pipeline first
+)
+
+echo.
+echo ============================================
+echo ENVIRONMENT VALIDATION COMPLETED
+echo ============================================
 
 exit /b 0

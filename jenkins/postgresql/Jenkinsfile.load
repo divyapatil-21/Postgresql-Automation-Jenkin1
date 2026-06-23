@@ -9,6 +9,12 @@ pipeline {
 
     stages {
 
+        stage('Checkout SCM') {
+            steps {
+                checkout scm
+            }
+        }
+
         stage('Repository Audit') {
             steps {
                 bat 'dir'
@@ -59,6 +65,9 @@ pipeline {
         }
         failure {
             echo 'PostgreSQL Load Pipeline Failed'
+        }
+        always {
+            echo 'PostgreSQL Load Pipeline Completed'
         }
     }
 }
