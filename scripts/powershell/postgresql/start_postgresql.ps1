@@ -19,7 +19,7 @@ if (Test-Path $ConfigFile) {
     }
 }
 
-$Port          = [int]($Config["POSTGRESQL_PORT"] ?? "5432")
+if ($Config["POSTGRESQL_PORT"]) { $Port = [int]$Config["POSTGRESQL_PORT"] } else { $Port = 5432 }
 $MaxRetries    = 30
 $RetryInterval = 3
 
@@ -38,7 +38,6 @@ if (!(Test-Path $PgCtl)) {
 
 $env:PATH = "$PgBin;$env:PATH"
 
-# ---- Check if already running ----
 $StatusOutput = & "$PgCtl" -D "$PgData" status 2>&1
 Write-Log "Status: $StatusOutput"
 
@@ -50,7 +49,6 @@ if ($StatusOutput -match "server is running") {
     Start-Sleep -Seconds 5
 }
 
-# ---- Wait for port ----
 Write-Log "Waiting for port $Port to be ready..."
 $Ready = $false
 for ($i = 1; $i -le $MaxRetries; $i++) {
