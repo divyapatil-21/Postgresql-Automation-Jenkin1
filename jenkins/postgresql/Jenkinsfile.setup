@@ -45,6 +45,12 @@ pipeline {
             }
         }
 
+         stage('Validate Tools') {
+    steps {
+        bat 'scripts\\batch\\common\\tools.bat'
+    }
+}
+
         stage('Deploy PostgreSQL') {
             steps {
                 bat 'scripts\\batch\\postgresql\\deploy_postgresql.bat'
@@ -63,8 +69,15 @@ pipeline {
         success {
             echo 'PostgreSQL Setup Pipeline Completed Successfully'
         }
+
         failure {
             echo 'PostgreSQL Setup Pipeline Failed'
         }
+
+        always {
+            echo 'PostgreSQL Setup Pipeline Finished'
+        }
     }
+
+  
 }
