@@ -22,11 +22,11 @@ echo Checking Liquibase...
 call "%~dp0validate_liquibase.bat"
 if errorlevel 1 exit /b 1
 
-echo Checking MySQL Driver...
-call "%~dp0validate_mysql_driver.bat"
+echo Checking PostgreSQL Driver...
+call "%~dp0validate_postgresql_driver.bat"
 if errorlevel 1 exit /b 1
 
-echo TERRAFORM VALIDATED
+echo ALL TOOLS VALIDATED
 
 
 
